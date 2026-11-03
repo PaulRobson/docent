@@ -64,7 +64,8 @@
 </script>
 
 {#snippet nodes(list: TreeNode[], depth: number)}
-	{#each list as node (node.path)}
+	<!-- A PR can replace a file with a folder of the same path: both are listed. -->
+	{#each list as node (`${node.type}:${node.path}`)}
 		{#if node.type === 'dir'}
 			{@const open = !closed.has(node.path)}
 			<li>
