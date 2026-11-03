@@ -26,30 +26,37 @@
 	const closed = new SvelteSet<string>();
 
 	// The file being read: the last whose header has scrolled up past the
-	// top of the page.
+	// top of the page. A file clicked stays picked out until you scroll
+	// yourself, as the scroll to it would pick out another.
 	let current = $state<string | null>(null);
+	let clicked = false;
 	$effect(() => {
 		let frame = 0;
 		const spy = () => {
 			cancelAnimationFrame(frame);
 			frame = requestAnimationFrame(() => {
+				if (clicked) return;
 				const sections = [...document.querySelectorAll<HTMLElement>('section.file[data-path]')].filter((s) => byFile.has(s.dataset.path!));
 				const past = sections.filter((s) => s.getBoundingClientRect().top <= 140);
 				current = (past.at(-1) ?? sections[0])?.dataset.path ?? null;
 			});
 		};
+		const release = () => (clicked = false);
 		spy();
 		window.addEventListener('scroll', spy, { passive: true });
 		window.addEventListener('resize', spy);
+		for (const event of ['wheel', 'touchmove', 'keydown', 'pointerdown']) window.addEventListener(event, release, { passive: true });
 		return () => {
 			cancelAnimationFrame(frame);
 			window.removeEventListener('scroll', spy);
 			window.removeEventListener('resize', spy);
+			for (const event of ['wheel', 'touchmove', 'keydown', 'pointerdown']) window.removeEventListener(event, release);
 		};
 	});
 
 	function show(path: string) {
 		current = path;
+		clicked = true;
 		session.revealingFile = path;
 	}
 
