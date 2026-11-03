@@ -1,5 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -55,6 +56,10 @@ function run(model: string, messages: ChatMessage[], schema: object | undefined,
 			? turns[0].content
 			: `${turns.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n\n')}\n\nReply to the user's last message as the assistant.`;
 
+	mkdirSync(workDir, { recursive: true });
+	const systemFile = system ? join(workDir, `system-${randomUUID()}.txt`) : null;
+	if (systemFile) writeFileSync(systemFile, system);
+
 	// Streamed when someone wants to see each look it takes.
 	const streaming = !!access?.onStep;
 	const args = [
@@ -69,7 +74,8 @@ function run(model: string, messages: ChatMessage[], schema: object | undefined,
 		'--setting-sources',
 		'local',
 		'--no-session-persistence',
-		...(system ? ['--system-prompt', system] : []),
+		// From a file: with the PR's conversation in it, it can pass Windows' 32K command-line limit.
+		...(systemFile ? ['--system-prompt-file', systemFile] : []),
 		...(schema ? ['--json-schema', JSON.stringify(schema)] : []),
 		...(access
 			? [
@@ -81,8 +87,7 @@ function run(model: string, messages: ChatMessage[], schema: object | undefined,
 			: [])
 	];
 
-	mkdirSync(workDir, { recursive: true });
-	return new Promise((resolve, reject) => {
+	return new Promise<HeadlessResult>((resolve, reject) => {
 		const child = spawn('claude', args, { cwd: workDir, signal });
 		let stdout = '';
 		let stderr = '';
@@ -108,7 +113,7 @@ function run(model: string, messages: ChatMessage[], schema: object | undefined,
 			}
 		});
 		child.stdin.end(prompt);
-	});
+	}).finally(() => systemFile && rmSync(systemFile, { force: true }));
 }
 
 // The looks a streamed line records, in words.
