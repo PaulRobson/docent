@@ -2,12 +2,12 @@
 	import Icon from '$lib/ui/Icon.svelte';
 	import { useSession } from '$lib/session/session.svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { fileTree, type TreeNode } from './fileTree';
+	import { fileTree, treeOrder, type TreeNode } from './fileTree';
 
 	// The files a slice changes, or the PR's, as a tree: each ticked once its
-	// hunks here are reviewed, the one being read picked out, and a click
-	// bringing a file into view.
-	let { keys }: { keys: string[] } = $props();
+	// hunks here are reviewed, the one being read picked out, a dot where
+	// there's something new to read, and a click bringing a file into view.
+	let { keys, slice }: { keys: string[]; slice?: string } = $props();
 
 	const session = useSession();
 
@@ -22,6 +22,9 @@
 	const tree = $derived(fileTree([...byFile.keys()]));
 	const statusOf = $derived(new Map(session.files.map((f) => [f.filename, f.status])));
 	const isReviewed = (path: string) => (byFile.get(path) ?? []).every((k) => session.reviewed[k]);
+	const unreadIn = (path: string) => session.unreadInFile(path, slice);
+	// A folder shows what's new inside it only while closed, as open, its files say.
+	const unreadUnder = (node: TreeNode) => treeOrder([node]).reduce((n, path) => n + unreadIn(path), 0);
 
 	const closed = new SvelteSet<string>();
 
@@ -63,6 +66,10 @@
 	const STATUS: Record<string, string> = { added: 'Added', removed: 'Deleted', renamed: 'Renamed' };
 </script>
 
+{#snippet dot(unread: number)}
+	{#if unread}<span class="unread" title="{unread} new to read" aria-label="{unread} new to read"></span>{/if}
+{/snippet}
+
 {#snippet nodes(list: TreeNode[], depth: number)}
 	<!-- A PR can replace a file with a folder of the same path: both are listed. -->
 	{#each list as node (`${node.type}:${node.path}`)}
@@ -78,6 +85,7 @@
 				>
 					<Icon name="chevron" size={12} turned={open} />
 					<span class="name">{node.name}</span>
+					{#if !open}{@render dot(unreadUnder(node))}{/if}
 				</button>
 				{#if open}<ul>{@render nodes(node.children, depth + 1)}</ul>{/if}
 			</li>
@@ -100,6 +108,7 @@
 							>{/if}
 					</span>
 					<span class="name">{node.name}</span>
+					{@render dot(unreadIn(node.path))}
 				</button>
 			</li>
 		{/if}
@@ -165,6 +174,15 @@
 	}
 	.file.current .name {
 		opacity: 1;
+	}
+	/* Something new to read in the file: the slice rail's dot, at the row's end. */
+	.unread {
+		flex-shrink: 0;
+		width: 6px;
+		height: 6px;
+		margin-left: auto;
+		border-radius: 3px;
+		background: var(--you);
 	}
 	/* Lines a file's name up under its folder's, past the folder's chevron. */
 	.tick {

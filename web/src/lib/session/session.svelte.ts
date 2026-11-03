@@ -348,6 +348,16 @@ export class PrSession {
 		return findings + threads;
 	}
 
+	// The same for one file: within a slice, only what's in it.
+	unreadInFile(path: string, sliceId?: string): number {
+		const inSlice = (slices: string[]) => !sliceId || slices.includes(sliceId);
+		const findings = this.allFindings.filter((f) => f.mark.unread && f.mark.path === path && inSlice(f.slices)).length;
+		const threads = this.record.notes.filter(
+			(n) => isUnread(n) && n.path === path && (!sliceId || n.slice === sliceId || this.slicesOf(n.path, n.start).includes(sliceId))
+		).length;
+		return findings + threads;
+	}
+
 	// Findings on a slice still waiting on a keep or skip.
 	undecidedIn(sliceId: string) {
 		return this.allFindings.filter((f) => !f.mark.decided && f.slices.includes(sliceId)).map((f) => f.mark);

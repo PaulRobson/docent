@@ -28,7 +28,7 @@
 					<span class="title">{s.title}</span>
 				</a>
 				{#if s.id === current}
-					{#key s.id}<FileTree keys={s.hunks} />{/key}
+					{#key s.id}<FileTree keys={s.hunks} slice={s.id} />{/key}
 				{/if}
 			</li>
 		{/each}
