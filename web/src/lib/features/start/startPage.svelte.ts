@@ -229,11 +229,14 @@ export class StartPage {
 		return list;
 	});
 	readonly pinned = $derived(this.rows.filter((pr) => this.isPinned(pr)));
-	readonly notDone = $derived(this.rows.filter((pr) => !this.isDone(pr) && !this.isHidden(pr) && !this.isPinned(pr)));
+	// What you've asked Docent for lately, latest first, above the PRs GitHub
+	// has waiting, however many and however old those are.
+	readonly inProgress = $derived(this.rows.filter((pr) => this.isInProgress(pr)).sort((a, b) => (b.record.lastOpenedAt ?? 0) - (a.record.lastOpenedAt ?? 0)));
+	readonly notDone = $derived(this.rows.filter((pr) => !this.isDone(pr) && !this.isHidden(pr) && !this.isPinned(pr) && !this.isInProgress(pr)));
 	// PRs the reviewer wrote get a section of their own.
 	readonly active = $derived(this.notDone.filter((pr) => !this.isMine(pr)));
 	readonly mine = $derived(this.notDone.filter((pr) => this.isMine(pr)));
-	readonly hiddenRows = $derived(this.rows.filter((pr) => this.isHidden(pr) && !this.isPinned(pr)));
+	readonly hiddenRows = $derived(this.rows.filter((pr) => this.isHidden(pr) && !this.isPinned(pr) && !this.isInProgress(pr)));
 	readonly done = $derived((this.saved ?? []).filter((pr) => this.isDone(pr) && !this.isHidden(pr) && !this.isPinned(pr)));
 	readonly checked = $derived(this.gh !== null && this.modelSources !== null);
 	readonly ready = $derived(!!this.gh?.login && !!this.modelSources?.length);
@@ -410,6 +413,17 @@ export class StartPage {
 
 	isPinned(pr: PrRef) {
 		return this.pinnedKeys.includes(keyOf(pr));
+	}
+
+	// Docent preparing or reviewing it now, or opened in the last day, so it
+	// stays at hand once its run is done. Not done, and not pinned: those
+	// have places of their own.
+	isInProgress(pr: Row): boolean {
+		if (pr.unsaved || this.isDone(pr) || this.isPinned(pr)) return false;
+		const generation = this.generationFor(pr);
+		if (generation?.status === 'queued' || isGenerating(generation)) return true;
+		if (this.panelFor(pr)?.running || this.#checking(pr)) return true;
+		return this.now - (pr.record.lastOpenedAt ?? 0) < 24 * 60 * 60_000;
 	}
 
 	async setPinned(pr: PrRef, pinned: boolean) {
