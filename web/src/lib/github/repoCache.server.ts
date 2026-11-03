@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { persistent } from '../storage/persistent.server.js';
 import type { PrFile } from './github.server.js';
 import { filesInDiff } from './diffFiles.js';
+import { githubHost } from './host.server.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -37,7 +38,7 @@ async function env(): Promise<NodeJS.ProcessEnv> {
 		...process.env,
 		GIT_TERMINAL_PROMPT: '0',
 		GIT_CONFIG_COUNT: '1',
-		GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
+		GIT_CONFIG_KEY_0: `http.https://${githubHost()}/.extraheader`,
 		GIT_CONFIG_VALUE_0: `Authorization: Basic ${auth}`
 	};
 }
@@ -67,7 +68,7 @@ async function ensureRepo(owner: string, repo: string, dir: string) {
 	if (existsSync(join(dir, 'HEAD'))) return;
 	mkdirSync(dir, { recursive: true });
 	await git(dir, ['init', '--quiet', '--bare']);
-	await git(dir, ['remote', 'add', 'origin', `https://github.com/${owner}/${repo}.git`]);
+	await git(dir, ['remote', 'add', 'origin', `https://${githubHost()}/${owner}/${repo}.git`]);
 	// Contents left out now come from GitHub when something reads them.
 	await git(dir, ['config', 'remote.origin.promisor', 'true']);
 	await git(dir, ['config', 'remote.origin.partialclonefilter', 'blob:none']);
