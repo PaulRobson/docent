@@ -2,7 +2,17 @@ import { readOk, sendJson, prUrl } from '../../api/client';
 import { groupsOf, isShown, reviewerName } from '../panel/findings';
 import type { Hunk } from '../reading/diff/parse';
 import type { PrSession } from '../../session/session.svelte';
-import { lineSpan, type FeedbackItem, type Job, type LineRef, type ReviewComment, type ReviewDraft, type ReviewEvent, type ReviewPayload } from '../../types';
+import {
+	lineSpan,
+	type AutoMerge,
+	type FeedbackItem,
+	type Job,
+	type LineRef,
+	type ReviewComment,
+	type ReviewDraft,
+	type ReviewEvent,
+	type ReviewPayload
+} from '../../types';
 
 // Posting the review: preparing it from what's kept (comments making the same
 // point merged, anything already said on the PR set aside), wording it, and
@@ -23,8 +33,9 @@ export class ReviewPost {
 		return this.#asking;
 	});
 	// Who's reviewing and who wrote the PR: GitHub won't let you approve or
-	// request changes on your own PR.
-	people = $state<{ viewer: string; author: string } | null>(null);
+	// request changes on your own PR. And whether auto-merge is on, which
+	// approving can set off.
+	people = $state<{ viewer: string; author: string; autoMerge: AutoMerge | null } | null>(null);
 	showDropped = $state(false);
 
 	constructor(session: PrSession) {
@@ -77,7 +88,7 @@ export class ReviewPost {
 	loadPeople() {
 		if (this.people) return;
 		fetch(this.#url('viewer'))
-			.then((res) => readOk<{ viewer: string; author: string }>(res))
+			.then((res) => readOk<{ viewer: string; author: string; autoMerge: AutoMerge | null }>(res))
 			.then((people) => (this.people = people))
 			.catch(() => {});
 	}
@@ -245,10 +256,14 @@ export class ReviewPost {
 		});
 	}
 
-	// Exactly what posting would send, without sending it.
-	async preview(pending = false): Promise<ReviewPayload> {
+	// Exactly what posting would send, without sending it. For an approval,
+	// whether auto-merge is on as of now.
+	async preview(pending = false): Promise<{ payload: ReviewPayload; autoMerge: AutoMerge | null }> {
 		if (!this.draft) throw new Error('Nothing prepared yet.');
-		return (await readOk<{ payload: ReviewPayload }>(await this.#send(this.draft, true, pending))).payload;
+		const res = await readOk<{ payload: ReviewPayload; autoMerge?: AutoMerge | null }>(await this.#send(this.draft, true, pending));
+		const autoMerge = res.autoMerge ?? null;
+		if (res.payload.event === 'APPROVE' && this.people) this.people = { ...this.people, autoMerge };
+		return { payload: res.payload, autoMerge };
 	}
 
 	#pendingReview() {

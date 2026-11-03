@@ -453,6 +453,12 @@ export interface ReviewDraft {
 	posted?: { at: number; url: string; pending?: boolean };
 }
 
+// Auto-merge turned on for a PR: who turned it on, and how it will merge.
+export interface AutoMerge {
+	by?: string;
+	method: 'merge' | 'squash' | 'rebase';
+}
+
 // What would be sent to GitHub, as the backend builds it.
 export interface ReviewPayload {
 	// None for a review left pending.

@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { badRequest, bodyOf, failed, validParams } from '$lib/api/http.server.js';
+import { pull } from '$lib/github/gh.server.js';
 import { buildReviewPayload, postReviewPayload, type CommentToPost, type ReviewEvent } from '$lib/features/posting/postReview.server.js';
 
 // With dryRun, returns exactly what would be sent without sending it. With
@@ -15,7 +16,12 @@ export const POST: RequestHandler = async ({ params: { owner, repo, number }, re
 	try {
 		const summary = typeof body.summary === 'string' ? body.summary : '';
 		const payload = await buildReviewPayload(owner, repo, number, body.pending === true ? undefined : event, summary, comments);
-		if (body.dryRun) return json({ payload });
+		// Approving can set off auto-merge: asked again here, as it may have
+		// been turned on since the page loaded.
+		if (body.dryRun) {
+			const autoMerge = payload.event === 'APPROVE' ? (await pull(owner, repo, number).catch(() => null))?.autoMerge : null;
+			return json({ payload, autoMerge: autoMerge ?? null });
+		}
 		return json({ payload, ...(await postReviewPayload(owner, repo, number, payload)) });
 	} catch (err) {
 		return failed(err);
