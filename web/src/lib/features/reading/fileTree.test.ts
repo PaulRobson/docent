@@ -7,6 +7,11 @@ describe('fileTree', () => {
 		expect(tree.map((n) => n.name)).toEqual(['lib', 'src', 'a.ts', 'b.ts']);
 	});
 
+	it('puts a test just after the file it tests', () => {
+		const tree = fileTree(['src/b.ts', 'src/a.test.ts', 'src/a.ts', 'src/a.spec.ts', 'src/ab.ts']);
+		expect(treeOrder(tree)).toEqual(['src/a.ts', 'src/a.spec.ts', 'src/a.test.ts', 'src/ab.ts', 'src/b.ts']);
+	});
+
 	it('joins a folder holding only one folder with it', () => {
 		const tree = fileTree(['web/src/lib/a.ts', 'web/src/lib/b.ts', 'web/src/c.ts']);
 		expect(tree).toEqual([

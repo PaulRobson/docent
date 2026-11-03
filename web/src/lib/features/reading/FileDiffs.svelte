@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
 	import { githubMarksFrom, marksFrom } from './marks';
+	import { fileTree, treeOrder } from './fileTree';
 	import { useSession } from '$lib/session/session.svelte';
 	import type { FileNote } from '$lib/types';
 	import DiffFile from './DiffFile.svelte';
@@ -28,13 +29,6 @@
 
 	const session = useSession();
 
-	// Tests sort just after the file they test: "src/a.test.ts" and
-	// "src/__tests__/a.ts" both sit beneath "src/a.ts".
-	function fileOrder(path: string): string {
-		const isTest = /\.(test|spec)\.[^/]+$/.test(path) || /(^|\/)(__tests__|tests?)\//.test(path);
-		const subject = path.replace(/(^|\/)(__tests__|tests?)\//, '$1').replace(/\.(test|spec)(\.[^/.]+)$/, '$2');
-		return `${subject}\u0000${isTest ? 1 : 0}`;
-	}
 	const marks = $derived([...marksFrom(session.record, true), ...githubMarksFrom(session.githubInReading, session.record)]);
 
 	const files = $derived.by(() => {
@@ -44,9 +38,11 @@
 			const path = key.slice(0, at);
 			byFile.set(path, [...(byFile.get(path) ?? []), Number(key.slice(at + 1))]);
 		}
+		// In the order the file tree shows them, so the two always match.
+		const order = new Map(treeOrder(fileTree([...byFile.keys()])).map((path, i) => [path, i]));
 		return session.files
 			.filter((f) => byFile.has(f.filename))
-			.sort((a, b) => fileOrder(a.filename).localeCompare(fileOrder(b.filename)))
+			.sort((a, b) => order.get(a.filename)! - order.get(b.filename)!)
 			.map((file) => {
 				const indices = byFile.get(file.filename)!;
 				const fileKeys = indices.map((i) => `${file.filename}#${i}`);

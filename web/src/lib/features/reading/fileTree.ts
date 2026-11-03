@@ -1,6 +1,7 @@
 // Paths as a tree of folders and files, the way an editor's explorer shows
-// them: folders first, then files, each by name, and a folder holding just
-// one folder shown as one, "src/lib", so a deep path doesn't stair-step.
+// them: folders first, then files, each by name with a test just after the
+// file it tests, and a folder holding just one folder shown as one,
+// "src/lib", so a deep path doesn't stair-step.
 export type TreeNode = { type: 'dir'; name: string; path: string; children: TreeNode[] } | { type: 'file'; name: string; path: string };
 
 export function fileTree(paths: string[]): TreeNode[] {
@@ -17,9 +18,12 @@ export function fileTree(paths: string[]): TreeNode[] {
 	}
 
 	const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
+	const isTest = (name: string) => /\.(test|spec)\.[^.]+$/.test(name);
+	const subject = (name: string) => name.replace(/\.(test|spec)(\.[^.]+)$/, '$2');
+	const byFile = (a: string, b: string) => byName(subject(a), subject(b)) || Number(isTest(a)) - Number(isTest(b)) || byName(a, b);
 	function build(dir: Dir, prefix: string): TreeNode[] {
 		const dirs = [...dir.dirs.entries()].sort(([a], [b]) => byName(a, b));
-		const files = [...dir.files].sort((a, b) => byName(a.slice(a.lastIndexOf('/') + 1), b.slice(b.lastIndexOf('/') + 1)));
+		const files = [...dir.files].sort((a, b) => byFile(a.slice(a.lastIndexOf('/') + 1), b.slice(b.lastIndexOf('/') + 1)));
 		return [
 			...dirs.map(([name, sub]): TreeNode => {
 				let label = name;
