@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { persistent } from '../storage/persistent.server.js';
+import type { AutoMerge } from '../types.js';
 
 // GitHub through the gh CLI, signed in as the reviewer. Its answers - a big
 // PR's files with their patches, say - can run well past Node's 1MB default
@@ -20,6 +21,7 @@ export interface Pull {
 	author?: string;
 	head: string;
 	base: string;
+	autoMerge: AutoMerge | null;
 }
 
 // A PR's own fields - its title, author, and the commits it starts and ends
@@ -31,7 +33,8 @@ export function pull(owner: string, repo: string, number: string): Promise<Pull>
 	const key = `${owner}/${repo}#${number}`;
 	const held = pulls.get(key);
 	if (held && Date.now() - held.at < 5_000) return held.pull;
-	const fields = '{title: .title, body: .body, htmlUrl: .html_url, author: .user.login, head: .head.sha, base: .base.sha}';
+	const fields =
+		'{title: .title, body: .body, htmlUrl: .html_url, author: .user.login, head: .head.sha, base: .base.sha, autoMerge: (.auto_merge | if . == null then null else {by: .enabled_by.login, method: .merge_method} end)}';
 	const read = gh(['api', `repos/${owner}/${repo}/pulls/${number}`, '--jq', fields]).then((out) => JSON.parse(out) as Pull);
 	pulls.set(key, { at: Date.now(), pull: read });
 	read.catch(() => pulls.delete(key));

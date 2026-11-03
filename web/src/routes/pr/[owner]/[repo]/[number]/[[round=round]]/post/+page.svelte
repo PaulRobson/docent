@@ -9,7 +9,7 @@
 	import Spinner from '$lib/ui/Spinner.svelte';
 	import { describeLines } from '$lib/features/posting/post.svelte';
 	import { useSession } from '$lib/session/session.svelte';
-	import type { ReviewComment, ReviewEvent, ReviewPayload } from '$lib/types';
+	import type { AutoMerge, ReviewComment, ReviewEvent, ReviewPayload } from '$lib/types';
 
 	// The last look before posting: the review laid out the way the author
 	// will see it on GitHub, the review's own text first and the comments on
@@ -42,9 +42,16 @@
 	const byId = $derived(new Map(post.candidates.map((c) => [c.item.id, c.item])));
 
 	let editing = $state<Record<string, boolean>>({});
-	let confirming = $state<ReviewPayload | null>(null);
+	let confirming = $state<{ payload: ReviewPayload; autoMerge: AutoMerge | null } | null>(null);
 	// A review left pending goes without an outcome, chosen on GitHub.
-	const confirmingPending = $derived(!!confirming && !confirming.event);
+	const confirmingPending = $derived(!!confirming && !confirming.payload.event);
+
+	// Approving can be what a PR with auto-merge on is waiting for: it then
+	// merges once its other requirements are met, with no one looking again.
+	const METHODS: Record<AutoMerge['method'], string> = { merge: 'merge', squash: 'squash and merge', rebase: 'rebase and merge' };
+	const autoMergeNote = (a: AutoMerge) =>
+		`Auto-merge is on for this PR (turned on${a.by ? ` by ${a.by}` : ''} to ${METHODS[a.method] ?? 'merge'}). Approving may merge it straight away, once its required checks pass.`;
+	const approvingAutoMerge = $derived(!isOwnPr && draft?.event === 'APPROVE' ? (post.people?.autoMerge ?? null) : null);
 
 	// What's changed in Wrap up since the review was prepared, in words.
 	const staleChange = $derived.by(() => {
@@ -314,6 +321,9 @@
 								: ''}
 						</p>
 					{/if}
+					{#if approvingAutoMerge}
+						<p class="auto-merge" role="status">{autoMergeNote(approvingAutoMerge)}</p>
+					{/if}
 					{#if postError && !confirming}<p class="bad">Couldn’t post the review: {postError}</p>{/if}
 					<div class="actions">
 						<span class="faint grow">{tally(keptInline, keptInBody, hasSummary)}</span>
@@ -338,13 +348,16 @@
 		<p class="confirm-text">
 			To {session.ref.owner}/{session.ref.repo}#{session.ref.number}{#if post.people}{' '}as {post.people.viewer}{/if}:
 			{#if confirmingPending}
-				a pending review, with {tally(confirming.comments.length, keptInBody, hasSummary)}. Only you see it until you submit it on GitHub, where you choose
-				Comment, Approve or Request changes.
+				a pending review, with {tally(confirming.payload.comments.length, keptInBody, hasSummary)}. Only you see it until you submit it on GitHub, where you
+				choose Comment, Approve or Request changes.
 			{:else}
-				{EVENTS.find((e) => e.event === confirming?.event)?.label}, with {tally(confirming.comments.length, keptInBody, hasSummary)}. It’s visible to everyone
-				on the PR.
+				{EVENTS.find((e) => e.event === confirming?.payload.event)?.label}, with {tally(confirming.payload.comments.length, keptInBody, hasSummary)}. It’s
+				visible to everyone on the PR.
 			{/if}
 		</p>
+		{#if confirming.payload.event === 'APPROVE' && confirming.autoMerge}
+			<p class="auto-merge" role="alert">{autoMergeNote(confirming.autoMerge)}</p>
+		{/if}
 		{#if post.stale}
 			<p class="confirm-stale">This review is out of date: since it was prepared, {staleChange}. It will post as it is now.</p>
 		{/if}
@@ -438,6 +451,17 @@
 	}
 	.confirm-stale {
 		color: var(--agent-text);
+	}
+	.send .auto-merge,
+	.auto-merge {
+		margin: 0;
+		padding: 10px 14px;
+		border-radius: 10px;
+		background: var(--popover);
+		box-shadow: 0 0 0 1px var(--popover-line);
+		color: var(--agent-text);
+		font-size: 14px;
+		line-height: 1.55;
 	}
 	.posted {
 		display: flex;
