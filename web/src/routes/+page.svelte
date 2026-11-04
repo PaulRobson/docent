@@ -103,7 +103,7 @@
 		{/if}
 		{#if page.restoreError}<p class="error">{page.restoreError}</p>{/if}
 
-		{#if page.pinned.length || page.active.length || page.mine.length || page.done.length || page.hiddenRows.length}
+		{#if page.inProgress.length || page.pinned.length || page.active.length || page.mine.length || page.done.length || page.hiddenRows.length}
 			<!-- How every list below is grouped. -->
 			<div class="list-tools">
 				<div class="grouping">
@@ -121,6 +121,16 @@
 					/>
 				</div>
 			</div>
+		{/if}
+
+		<!-- Latest first and never grouped: what you just asked for is at the top. -->
+		{#if page.inProgress.length}
+			<section aria-labelledby="progress-heading">
+				<h2 id="progress-heading" class="caps">In progress</h2>
+				<ul>
+					{#each page.inProgress as pr (keyOf(pr))}<ReviewRow {pr} {page} />{/each}
+				</ul>
+			</section>
 		{/if}
 
 		{#if page.pinned.length}
