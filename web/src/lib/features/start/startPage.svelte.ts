@@ -279,14 +279,16 @@ export class StartPage {
 			const every = setInterval(() => this.saved && this.#loadStatuses(this.saved, true), 5 * 60_000);
 			return () => clearInterval(every);
 		});
+		// Kept current whether or not anything's running, so a review's day
+		// in progress runs out, and times like "5 min ago" stay right.
+		$effect(() => {
+			const tick = setInterval(() => (this.now = Date.now()), 60_000);
+			return () => clearInterval(tick);
+		});
 		$effect(() => {
 			if (!this.anyRunning) return;
 			const poll = setInterval(() => this.refresh(), 2000);
-			const tick = setInterval(() => (this.now = Date.now()), 30000);
-			return () => {
-				clearInterval(poll);
-				clearInterval(tick);
-			};
+			return () => clearInterval(poll);
 		});
 	}
 
@@ -417,12 +419,13 @@ export class StartPage {
 
 	// Docent preparing or reviewing it now, or opened in the last day, so it
 	// stays at hand once its run is done. Not done, and not pinned: those
-	// have places of their own.
+	// have places of their own. A hidden one shows only while Docent works on it.
 	isInProgress(pr: Row): boolean {
 		if (pr.unsaved || this.isDone(pr) || this.isPinned(pr)) return false;
 		const generation = this.generationFor(pr);
 		if (generation?.status === 'queued' || isGenerating(generation)) return true;
 		if (this.panelFor(pr)?.running || this.#checking(pr)) return true;
+		if (this.isHidden(pr)) return false;
 		return this.now - (pr.record.lastOpenedAt ?? 0) < 24 * 60 * 60_000;
 	}
 
