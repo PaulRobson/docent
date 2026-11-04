@@ -128,9 +128,9 @@ const LOOK_NOTE = (pr: string) => `
 
 You can look beyond the code shown, through Docent's tools (pass ${pr} as the PR): read_file for \
 any file at the PR's head, search_code to find where something is defined or used, list_files, \
-get_diff for the rest of the PR's changes, and get_existing_comments for what's been said on the \
-PR. When the answer depends on code you haven't been \
-shown - a type's definition, what a caller expects, another part of the PR - look it up rather \
+get_diff for the rest of the PR's changes, get_existing_comments for what's been said on the PR, \
+and get_review_context for its title and description, as its author wrote them. When the answer \
+depends on code you haven't been shown - a type's definition, what a caller expects, another part of the PR - look it up rather \
 than guess, and say which file and line you relied on. Answer straight away when what's shown is \
 enough.`;
 
@@ -145,7 +145,9 @@ export function replyToNote(context: NoteContext, messages: NoteMessage[], signa
 			{ role: 'user', content: `${contextMessage(context)}\n\n${context.finding ? 'The reviewer asks' : 'The reviewer wrote'}:\n${first.text}` },
 			...rest.map((m): ChatMessage => ({ role: m.role, content: m.text }))
 		];
-		const tools = looks ? { mcpUrl: access!.mcpUrl, tools: ['get_diff', 'read_file', 'list_files', 'search_code', 'get_existing_comments'] } : undefined;
+		const tools = looks
+			? { mcpUrl: access!.mcpUrl, tools: ['get_review_context', 'get_diff', 'read_file', 'list_files', 'search_code', 'get_existing_comments'] }
+			: undefined;
 		return chat(conversation, signal, model ?? modelName(), tools);
 	}, model);
 }

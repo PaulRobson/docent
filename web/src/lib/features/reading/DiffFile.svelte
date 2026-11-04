@@ -404,6 +404,17 @@
 		});
 	});
 
+	// Brings the file into view when the file tree asks: opens it, and puts
+	// its header at the top.
+	$effect(() => {
+		if (session.revealingFile !== file.filename) return;
+		untrack(() => {
+			session.revealingFile = null;
+			collapsed = false;
+			requestAnimationFrame(() => sectionEl?.scrollIntoView({ block: 'start' }));
+		});
+	});
+
 	// A click anywhere but the open thread, finding or composer closes it.
 	$effect(() => {
 		if (!session.openMark && !(selection && !dragging)) return;
@@ -631,6 +642,8 @@
 <style>
 	.file {
 		border-bottom: 1px solid var(--line);
+		/* Clear of the site header when the file tree brings it into view. */
+		scroll-margin-top: 72px;
 	}
 	.file-note {
 		display: flex;
