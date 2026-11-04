@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { isSliceReviewed, useSession } from '$lib/session/session.svelte';
 	import StateMark from '../../ui/StateMark.svelte';
+	import FileTree from './FileTree.svelte';
 
-	// The slices, down the side while reading, with All files beneath.
+	// The slices, down the side while reading, with All files beneath, and
+	// the files of the one being read as a tree under it.
 	let { current = null, allFiles = false }: { current?: string | null; allFiles?: boolean } = $props();
 
 	const session = useSession();
@@ -11,7 +13,7 @@
 
 <nav aria-label="Slices">
 	<div class="head"><span class="label">Slices</span><span class="faint count">{session.reviewedSlices} of {session.slices.length}</span></div>
-	<ol>
+	<ol class:grow={!allFiles}>
 		{#each session.slices as s (s.id)}
 			{@const reviewed = isSliceReviewed(s, session.reviewed)}
 			{@const unread = session.unreadIn(s.id)}
@@ -25,6 +27,9 @@
 					</span>
 					<span class="title">{s.title}</span>
 				</a>
+				{#if s.id === current}
+					{#key s.id}<FileTree keys={s.hunks} slice={s.id} />{/key}
+				{/if}
 			</li>
 		{/each}
 	</ol>
@@ -34,6 +39,7 @@
 		>
 		All {session.files.length} files
 	</a>
+	{#if allFiles}<FileTree keys={session.hunkKeys} />{/if}
 </nav>
 
 <style>
@@ -72,6 +78,9 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
+	}
+	/* All files sits at the foot of the rail, unless its tree is showing. */
+	ol.grow {
 		flex-grow: 1;
 	}
 	a {

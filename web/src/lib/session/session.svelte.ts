@@ -348,6 +348,16 @@ export class PrSession {
 		return findings + threads;
 	}
 
+	// The same for one file: within a slice, only what's in it.
+	unreadInFile(path: string, sliceId?: string): number {
+		const inSlice = (slices: string[]) => !sliceId || slices.includes(sliceId);
+		const findings = this.allFindings.filter((f) => f.mark.unread && f.mark.path === path && inSlice(f.slices)).length;
+		const threads = this.record.notes.filter(
+			(n) => isUnread(n) && n.path === path && (!sliceId || n.slice === sliceId || this.slicesOf(n.path, n.start).includes(sliceId))
+		).length;
+		return findings + threads;
+	}
+
 	// Findings on a slice still waiting on a keep or skip.
 	undecidedIn(sliceId: string) {
 		return this.allFindings.filter((f) => !f.mark.decided && f.slices.includes(sliceId)).map((f) => f.mark);
@@ -356,6 +366,9 @@ export class PrSession {
 	// A thread or finding to bring into view and open: its file opens, and so
 	// does any fold hiding it. Cleared by the file that shows it.
 	revealing = $state<string | null>(null);
+	// A file to bring into view and open, from the file tree. Cleared by the
+	// file that shows it.
+	revealingFile = $state<string | null>(null);
 	// The thread or finding whose bubble is open: one across the page, so
 	// opening another, in any file, closes it.
 	openMark = $state<string | null>(null);
