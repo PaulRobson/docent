@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import { persistent } from '../storage/persistent.server.js';
 import type { PrFile } from './github.server.js';
 import { filesInDiff } from './diffFiles.js';
-import { githubHost } from './host.server.js';
+import { DEFAULT_HOST, githubHost } from './host.server.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -57,8 +57,17 @@ async function git(dir: string, args: string[], extraEnv: Record<string, string>
 // over each other.
 const queues = persistent('repo-cache.queues', () => new Map<string, Promise<unknown>>());
 
+// A github.com repo's clone sits at repos/<owner>/<repo>.git, as it always
+// has; another host's under a folder of that host's own, so the same
+// owner/repo on two hosts never shares one. Owners can't have dots in their
+// names, so a host's folder can't be taken for an owner's.
+function repoDir(owner: string, repo: string): string {
+	const host = githubHost();
+	return host === DEFAULT_HOST ? join(root, owner, `${repo}.git`) : join(root, host, owner, `${repo}.git`);
+}
+
 function inRepo<T>(owner: string, repo: string, work: (dir: string) => Promise<T>): Promise<T> {
-	const dir = join(root, owner, `${repo}.git`);
+	const dir = repoDir(owner, repo);
 	const run = (queues.get(dir) ?? Promise.resolve()).catch(() => {}).then(() => work(dir));
 	queues.set(dir, run);
 	return run;
